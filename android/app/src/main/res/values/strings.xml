@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DigiTalib Library</string>
+    <string name="title_activity_main">DigiTalib Library</string>
+    <string name="package_name">id.sch.digitalib</string>
+    <string name="custom_url_scheme">id.sch.digitalib</string>
+</resources>

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+dist-electron
+build
+
+# IDE & OS
+.DS_Store
+*.pem
+.vscode
+.idea
+*.log
+tsconfig.tsbuildinfo
+
+# Capacitor / Android build outputs
+android/app/build
+android/.gradle
+android/captures
+android/local.properties
+
+# Temp media / scratch
+.tempmediaStorage

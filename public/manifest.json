@@ -1,0 +1,17 @@
+{
+  "name": "DigiTalib Hybrid Library",
+  "short_name": "DigiTalib",
+  "description": "Sistem Perpustakaan Hybrid Sekolah Berbasis Offline-First & Google Apps Script API",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
