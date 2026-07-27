@@ -43,6 +43,9 @@ export interface Transaction {
 }
 
 export interface LibrarySettings {
+  schoolName?: string;
+  libraryName?: string;
+  schoolLogoUrl?: string;
   maxBorrowDays: number;
   maxBorrowLimit: number;
   finePerDay: number;

@@ -305,6 +305,7 @@ export const App: React.FC = () => {
             setActiveTab('catalog');
             showToast('Anda telah keluar dari sesi perpustakaan.', 'info');
           }}
+          libraryPolicy={libraryPolicy}
         />
 
       {/* Floating Notification Toast */}
@@ -518,6 +519,7 @@ export const App: React.FC = () => {
         onClose={() => setIsStudentCardOpen(false)}
         user={currentUser}
         activeLoans={userTransactions}
+        libraryPolicy={libraryPolicy}
       />
 
       <PDFReaderModal

@@ -215,6 +215,9 @@ export async function setAppSetting(key: string, val: any): Promise<void> {
 }
 
 const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
+  schoolName: 'SMA Negeri DigiTalib',
+  libraryName: 'Perpustakaan DigiSchool',
+  schoolLogoUrl: '',
   maxBorrowDays: 7,
   maxBorrowLimit: 3,
   finePerDay: 1000,

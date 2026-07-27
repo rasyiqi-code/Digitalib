@@ -2,13 +2,14 @@ import React, { useRef, useState } from 'react';
 import QRCode from 'react-qr-code';
 import { toPng } from 'html-to-image';
 import { X, ShieldCheck, CreditCard, Sparkles, BookOpenCheck, Download, Loader2 } from 'lucide-react';
-import { User, Transaction } from '../types';
+import { User, Transaction, LibrarySettings } from '../types';
 
 interface StudentCardModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: User | null;
   activeLoans: Transaction[];
+  libraryPolicy?: LibrarySettings;
 }
 
 export const StudentCardModal: React.FC<StudentCardModalProps> = ({
@@ -16,6 +17,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
   onClose,
   user,
   activeLoans,
+  libraryPolicy,
 }) => {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -32,7 +34,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
   });
 
   const activeLoansCount = activeLoans.filter((t) => t.status === 'DIPINJAM').length;
-  const maxBorrowLimit = 3;
+  const maxBorrowLimit = libraryPolicy?.maxBorrowLimit || 3;
 
   const handleDownloadPng = async () => {
     if (!cardRef.current) return;
@@ -95,8 +97,12 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
                 📚
               </div>
               <div>
-                <h4 className="text-xs font-black tracking-wider uppercase leading-none">PERPUSTAKAAN DIGITASCHOOL</h4>
-                <p className="text-[9px] text-emerald-100 font-bold tracking-widest uppercase mt-0.5">KARTU ANGGOTA PERPUSTAKAAN</p>
+                <h4 className="text-xs font-black tracking-wider uppercase leading-none">
+                  {libraryPolicy?.libraryName || 'PERPUSTAKAAN DIGITASCHOOL'}
+                </h4>
+                <p className="text-[9px] text-emerald-100 font-bold tracking-widest uppercase mt-0.5">
+                  {libraryPolicy?.schoolName || 'SMA NEGERI DIGITALIB'}
+                </p>
               </div>
             </div>
             <span className="text-[9px] font-extrabold px-2 py-0.5 rounded bg-white/20 border border-white/30 tracking-wider">OFFICIAL</span>

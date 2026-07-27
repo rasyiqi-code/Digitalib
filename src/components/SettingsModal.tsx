@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Database, RefreshCw, Link as LinkIcon, Server, Trash2, CloudDownload, Clock, DollarSign, BookOpen, Bell } from 'lucide-react';
+import { X, Settings, Database, RefreshCw, Link as LinkIcon, Server, Trash2, CloudDownload, Clock, DollarSign, BookOpen, Bell, Building2 } from 'lucide-react';
 import { getConfig, saveConfig, fetchInitialDataFromGAS } from '../services/api';
 import { clearAllLocalData, getLibrarySettings, saveLibrarySettings } from '../services/db';
 import { AppConfig, LibrarySettings } from '../types';
@@ -175,6 +175,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               <CloudDownload className="w-3 h-3 text-emerald-600" />
               <span>Tarik Data GAS</span>
             </button>
+          </div>
+
+          {/* Institution Identity Customization Section */}
+          <div className="pt-3 border-t border-slate-100 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-emerald-700 font-extrabold text-[11px] uppercase tracking-wider">
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Identitas Sekolah & Perpustakaan</span>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                Nama Sekolah / Lembaga
+              </label>
+              <input
+                type="text"
+                placeholder="misal: SMA Negeri 1 Jakarta"
+                value={policy.schoolName || ''}
+                onChange={(e) => setPolicyState({ ...policy, schoolName: e.target.value })}
+                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                Nama Perpustakaan Resmi
+              </label>
+              <input
+                type="text"
+                placeholder="misal: Perpustakaan DigiSchool"
+                value={policy.libraryName || ''}
+                onChange={(e) => setPolicyState({ ...policy, libraryName: e.target.value })}
+                className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs"
+              />
+            </div>
           </div>
 
           {/* Library Policy & Fine Rate Settings Section */}

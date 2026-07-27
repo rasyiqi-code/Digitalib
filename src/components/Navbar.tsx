@@ -1,6 +1,6 @@
 import React from 'react';
 import { BookOpen, RefreshCw, Wifi, WifiOff, Settings, LogOut } from 'lucide-react';
-import { User } from '../types';
+import { User, LibrarySettings } from '../types';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -15,6 +15,7 @@ interface NavbarProps {
   onOpenProfile: () => void;
   onSync: () => void;
   onLogout: () => void;
+  libraryPolicy?: LibrarySettings;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -30,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenProfile,
   onSync,
   onLogout,
+  libraryPolicy,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 py-3 shadow-xs">
@@ -37,14 +39,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         
         {/* Brand Mobile App Logo */}
         <div className="flex items-center space-x-2.5 cursor-pointer" onClick={() => setActiveTab('catalog')}>
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
             <BookOpen className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <span className="text-base font-extrabold tracking-tight text-slate-900">
-              DigiTalib
+          <div className="min-w-0">
+            <span className="text-base font-extrabold tracking-tight text-slate-900 block truncate">
+              {libraryPolicy?.libraryName || 'DigiTalib'}
             </span>
-            <div className="text-[9px] font-bold text-emerald-600">Mobile Library</div>
+            <div className="text-[9px] font-bold text-emerald-600 truncate">
+              {libraryPolicy?.schoolName || 'Mobile Library'}
+            </div>
           </div>
         </div>
 
