@@ -34,7 +34,7 @@ export async function loginUser(nis: string, pin: string): Promise<{ success: bo
     try {
       const response = await fetch(config.gasUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'login',
           payload: { nis, pin },
@@ -92,7 +92,7 @@ export async function syncPendingQueueToGAS(): Promise<{ synced: number; failed:
   try {
     const response = await fetch(config.gasUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'syncBatch',
         payload: { items: pendingItems },
@@ -145,7 +145,7 @@ export async function uploadPdfFileToGASDrive(fileName: string, base64Data: stri
   try {
     const res = await fetch(config.gasUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'uploadPdfToDrive',
         payload: { fileName, base64Data },
