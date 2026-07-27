@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import QRCode from 'react-qr-code';
-import { X, ShieldCheck, CreditCard, Sparkles, BookOpenCheck, Printer } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import { X, ShieldCheck, CreditCard, Sparkles, BookOpenCheck, Download, Loader2 } from 'lucide-react';
 import { User, Transaction } from '../types';
 
 interface StudentCardModalProps {
@@ -16,6 +17,9 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
   user,
   activeLoans,
 }) => {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
   if (!isOpen || !user) return null;
 
   // Format QR Code JSON payload for offline admin validation
@@ -30,25 +34,41 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
   const activeLoansCount = activeLoans.filter((t) => t.status === 'DIPINJAM').length;
   const maxBorrowLimit = 3;
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPng = async () => {
+    if (!cardRef.current) return;
+    setIsDownloading(true);
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        quality: 0.98,
+        cacheBust: true,
+        pixelRatio: 2, // High resolution crisp image export
+      });
+      const link = document.createElement('a');
+      link.download = `Kartu_Anggota_${user.nis}_${user.nama.replace(/\s+/g, '_')}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Gagal mengunduh gambar kartu:', err);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in print:p-0 print:bg-white print:static print:block">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 overflow-hidden print:w-full print:max-w-none print:p-0 print:shadow-none print:border-none print:rounded-none">
+      <div className="relative w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 overflow-hidden">
         
-        {/* Top Header Control Bar (Hidden on Print) */}
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 print:hidden">
+        {/* Top Header Control Bar */}
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
               <CreditCard className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Kartu Anggota Perpustakaan</h3>
-              <p className="text-[10px] text-slate-500">Format Fisik Siap Cetak (CR80 ID Card)</p>
+              <p className="text-[10px] text-slate-500">Format Gambar HD Siap Simpan / Cetak (PNG)</p>
             </div>
           </div>
           <button
@@ -61,9 +81,12 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* PRINTABLE PHYSICAL ID CARD FRAME (Standard CR80 Printable Dimensions) */}
+        {/* PRINTABLE / DOWNLOADABLE PHYSICAL ID CARD FRAME */}
         {/* ========================================================================= */}
-        <div className="id-card-printable w-full bg-white rounded-2xl border-2 border-slate-300 shadow-md overflow-hidden font-sans text-slate-900 print:border-2 print:border-slate-800 print:shadow-none print:rounded-2xl">
+        <div 
+          ref={cardRef}
+          className="id-card-printable w-full bg-white rounded-2xl border-2 border-slate-300 shadow-md overflow-hidden font-sans text-slate-900"
+        >
           
           {/* Card Header Accent Bar */}
           <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white px-4 py-3 flex items-center justify-between shadow-xs">
@@ -158,14 +181,24 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
 
         </div>
 
-        {/* Action Buttons (Print & Close) (Hidden on Print) */}
-        <div className="mt-4 flex gap-2 print:hidden">
+        {/* Action Button: Download PNG Image */}
+        <div className="mt-4">
           <button
-            onClick={handlePrint}
-            className="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2"
+            onClick={handleDownloadPng}
+            disabled={isDownloading}
+            className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2"
           >
-            <Printer className="w-4 h-4" />
-            <span>Cetak Kartu Anggota (Print / PDF)</span>
+            {isDownloading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Mengunduh Berkas PNG...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Unduh Kartu Anggota (PNG Image)</span>
+              </>
+            )}
           </button>
         </div>
 
