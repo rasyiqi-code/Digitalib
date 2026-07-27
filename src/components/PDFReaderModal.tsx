@@ -52,19 +52,23 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({ isOpen, onClose,
 
     // Handle Google Drive links
     if (url.includes('drive.google.com')) {
-      if (url.includes('/view')) {
-        return url.replace('/view', '/preview');
+      let cleanUrl = url;
+      if (cleanUrl.includes('/view')) {
+        cleanUrl = cleanUrl.replace('/view', '/preview');
       }
-      if (url.includes('/edit')) {
-        return url.replace('/edit', '/preview');
+      if (cleanUrl.includes('/edit')) {
+        cleanUrl = cleanUrl.replace('/edit', '/preview');
       }
-      if (url.includes('/uc?') || url.includes('export=download')) {
-        const match = url.match(/id=([a-zA-Z0-9_-]+)/);
+      if (cleanUrl.includes('/uc?') || cleanUrl.includes('export=download')) {
+        const match = cleanUrl.match(/id=([a-zA-Z0-9_-]+)/);
         if (match && match[1]) {
-          return `https://drive.google.com/file/d/${match[1]}/preview`;
+          cleanUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
         }
       }
-      return url;
+      if (!cleanUrl.includes('#toolbar=0')) {
+        cleanUrl += '#toolbar=0';
+      }
+      return cleanUrl;
     }
 
     // Direct PDF URL fallback: Use Google Docs Embedded Viewer to force inline reading without auto-download
@@ -179,7 +183,15 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({ isOpen, onClose,
       <div className="flex-1 bg-slate-200/50 p-2 overflow-auto flex items-center justify-center relative">
         {embedPdfUrl ? (
           /* Real Embedded PDF Document Viewer (Supports Google Drive / Direct PDF) */
-          <div className="w-full h-full rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+          <div className="w-full h-full rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm relative">
+            {/* Top-Right Mask Overlay to hide Google Drive "Lepas / Open in New Window" Pop-out button */}
+            <div 
+              className="absolute top-0 right-0 w-14 h-12 bg-white/95 backdrop-blur-xs z-10 pointer-events-auto rounded-bl-xl border-l border-b border-slate-200/50 flex items-center justify-center shadow-xs"
+              title="Perpustakaan Digital School Reader"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-500/80" />
+            </div>
+
             <iframe
               src={embedPdfUrl}
               className="w-full h-full border-0 bg-white"
