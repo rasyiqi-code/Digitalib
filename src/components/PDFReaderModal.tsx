@@ -182,16 +182,11 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({ isOpen, onClose,
       {/* Embedded PDF Reading Screen */}
       <div className="flex-1 bg-slate-200/50 p-2 overflow-auto flex items-center justify-center relative">
         {embedPdfUrl ? (
-          /* Real Embedded PDF Document Viewer (Supports Google Drive / Direct PDF) */
+          /* Real Embedded PDF Document Viewer (Crops top Google Drive header bar automatically) */
           <div className="w-full h-full rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm relative">
-            {/* Seamless Top-Right Mask Overlay to hide Google Drive "Lepas / Open in New Window" button */}
-            <div 
-              className="absolute top-0 right-0 w-16 h-14 bg-white z-10 pointer-events-auto"
-            />
-
             <iframe
               src={embedPdfUrl}
-              className="w-full h-full border-0 bg-white"
+              className="w-full h-[calc(100%+56px)] -mt-14 border-0 bg-white"
               title={`E-Book Reader - ${book.judul}`}
               allow="autoplay"
             />
