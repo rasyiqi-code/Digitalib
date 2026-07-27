@@ -1,6 +1,6 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
-import { X, ShieldCheck, CreditCard, Sparkles, BookOpenCheck } from 'lucide-react';
+import { X, ShieldCheck, CreditCard, Sparkles, BookOpenCheck, Printer } from 'lucide-react';
 import { User, Transaction } from '../types';
 
 interface StudentCardModalProps {
@@ -30,87 +30,143 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
   const activeLoansCount = activeLoans.filter((t) => t.status === 'DIPINJAM').length;
   const maxBorrowLimit = 3;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-sm glass-modal rounded-3xl p-6 shadow-2xl border border-slate-700/80 overflow-hidden">
-        
-        {/* Modal Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-white transition z-10"
-        >
-          <X className="w-5 h-5" />
-        </button>
+  const handlePrint = () => {
+    window.print();
+  };
 
-        {/* Digital Student Card Container */}
-        <div className="relative rounded-2xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-950 p-5 border border-emerald-500/30 shadow-xl overflow-hidden">
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in print:p-0 print:bg-white print:static print:block">
+      
+      {/* Modal Container */}
+      <div className="relative w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 overflow-hidden print:w-full print:max-w-none print:p-0 print:shadow-none print:border-none print:rounded-none">
+        
+        {/* Top Header Control Bar (Hidden on Print) */}
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 print:hidden">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+              <CreditCard className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Kartu Anggota Perpustakaan</h3>
+              <p className="text-[10px] text-slate-500">Format Fisik Siap Cetak (CR80 ID Card)</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900 transition"
+            title="Tutup"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* PRINTABLE PHYSICAL ID CARD FRAME (Standard CR80 Printable Dimensions) */}
+        {/* ========================================================================= */}
+        <div className="id-card-printable w-full bg-white rounded-2xl border-2 border-slate-300 shadow-md overflow-hidden font-sans text-slate-900 print:border-2 print:border-slate-800 print:shadow-none print:rounded-2xl">
           
-          {/* Card Header & Branding */}
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                <CreditCard className="w-4 h-4" />
+          {/* Card Header Accent Bar */}
+          <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white px-4 py-3 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs border border-white/40 flex items-center justify-center font-black text-sm">
+                📚
               </div>
               <div>
-                <div className="text-xs font-bold text-white tracking-wide">KARTU ANGGOTA PERPUS</div>
-                <div className="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider">SMA NEGERI DIGITALIB</div>
+                <h4 className="text-xs font-black tracking-wider uppercase leading-none">PERPUSTAKAAN DIGITASCHOOL</h4>
+                <p className="text-[9px] text-emerald-100 font-bold tracking-widest uppercase mt-0.5">KARTU ANGGOTA PERPUSTAKAAN</p>
               </div>
             </div>
-            <Sparkles className="w-4 h-4 text-emerald-400 opacity-60" />
+            <span className="text-[9px] font-extrabold px-2 py-0.5 rounded bg-white/20 border border-white/30 tracking-wider">OFFICIAL</span>
           </div>
 
-          {/* Student Details & Photo */}
-          <div className="mt-4 flex items-center space-x-4">
-            <img
-              src={user.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb'}
-              alt={user.nama}
-              className="w-16 h-16 rounded-xl object-cover ring-2 ring-emerald-500/40 shadow-lg"
-            />
-            <div>
-              <h4 className="text-sm font-extrabold text-white leading-snug">{user.nama}</h4>
-              <p className="text-xs text-slate-300 font-medium">Kelas: {user.kelas}</p>
-              <div className="mt-1 flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                  NIS: {user.nis}
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold uppercase">
-                  {user.role}
+          {/* Card Body Content */}
+          <div className="p-4 space-y-3">
+            
+            {/* Student Profile Info & QR Layout */}
+            <div className="flex items-center gap-3.5">
+              
+              {/* Photo Frame */}
+              <div className="relative shrink-0">
+                <img
+                  src={
+                    user.avatarUrl ||
+                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.nis}`
+                  }
+                  alt={user.nama}
+                  className="w-18 h-22 rounded-xl object-cover border-2 border-emerald-600 shadow-xs bg-slate-100"
+                />
+                <div className="absolute -bottom-1 -right-1 p-1 rounded-full bg-emerald-600 text-white shadow-xs">
+                  <ShieldCheck className="w-3 h-3" />
+                </div>
+              </div>
+
+              {/* Student Details */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-black text-slate-900 leading-snug line-clamp-1">{user.nama}</h3>
+                <div className="space-y-0.5 mt-1 text-xs">
+                  <div className="flex items-center gap-1 text-slate-700 font-bold">
+                    <span className="text-slate-400 font-medium text-[10px]">NIS:</span>
+                    <span className="font-mono text-emerald-800 font-extrabold text-xs">{user.nis}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-700 font-bold">
+                    <span className="text-slate-400 font-medium text-[10px]">Kelas:</span>
+                    <span className="text-slate-900 text-xs">{user.kelas}</span>
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] font-extrabold uppercase">
+                    {user.role === 'super_admin' ? 'SUPER ADMIN' : user.role === 'admin' ? 'PUSTAKAWAN' : 'SISWA AKTIF'}
+                  </span>
+                </div>
+              </div>
+
+              {/* High Contrast QR Code */}
+              <div className="shrink-0 p-1.5 rounded-xl bg-white border border-slate-300 shadow-xs flex flex-col items-center">
+                <QRCode
+                  value={qrPayload}
+                  size={75}
+                  bgColor="#ffffff"
+                  fgColor="#090d16"
+                  level="M"
+                />
+                <span className="text-[8px] font-bold text-slate-700 mt-1 font-mono tracking-tighter">
+                  {user.nis}
                 </span>
               </div>
+
             </div>
-          </div>
 
-          {/* QR Code Container */}
-          <div className="mt-5 p-4 rounded-xl bg-white flex flex-col items-center justify-center shadow-inner">
-            <QRCode
-              value={qrPayload}
-              size={140}
-              bgColor="#ffffff"
-              fgColor="#090d16"
-              level="M"
-            />
-            <span className="text-[10px] font-bold text-slate-800 mt-2 tracking-widest font-mono">
-              * NIS-{user.nis} *
-            </span>
-          </div>
-
-          {/* Borrowing Limit Meter */}
-          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 text-slate-300">
-              <BookOpenCheck className="w-4 h-4 text-emerald-400" />
-              <span>Buku Dipinjam:</span>
+            {/* Card Footer Line & Security Validation */}
+            <div className="pt-2.5 border-t border-slate-200 flex items-center justify-between text-[9px] text-slate-500 font-medium">
+              <span className="flex items-center gap-1">
+                <BookOpenCheck className="w-3 h-3 text-emerald-600" />
+                <span>Batas Pinjam: <strong>{activeLoansCount}/{maxBorrowLimit} Buku</strong></span>
+              </span>
+              <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                VALIDATED • ONLINE/OFFLINE
+              </span>
             </div>
-            <span className="font-bold text-white">
-              {activeLoansCount} / {maxBorrowLimit} Buku
-            </span>
+
           </div>
 
-          {/* Verification Badge */}
-          <div className="mt-3 flex items-center justify-center gap-1 text-[10px] text-emerald-400 font-medium bg-emerald-950/40 py-1.5 rounded-lg border border-emerald-500/20">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Kartu Sah & Didukung Validasi Luring (Offline)</span>
+          {/* Bottom Card Strip */}
+          <div className="bg-slate-100 border-t border-slate-200 px-4 py-1.5 flex justify-between items-center text-[8px] text-slate-500 font-semibold">
+            <span>Diterbitkan oleh Perpustakaan Resmi Sekolah</span>
+            <span>Berlaku Selama Menjadi Anggota</span>
           </div>
 
+        </div>
+
+        {/* Action Buttons (Print & Close) (Hidden on Print) */}
+        <div className="mt-4 flex gap-2 print:hidden">
+          <button
+            onClick={handlePrint}
+            className="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Cetak Kartu Anggota (Print / PDF)</span>
+          </button>
         </div>
 
       </div>
