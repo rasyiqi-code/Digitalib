@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   seedInitialDataIfNeeded,
@@ -9,8 +9,9 @@ import {
   createReturnTransactionInDB,
   getPendingSyncQueue,
   getLibrarySettings,
+  getUserByNIS,
 } from './services/db';
-import { syncPendingQueueToGAS, getConfig } from './services/api';
+import { syncPendingQueueToGAS } from './services/api';
 import { Book, User, Transaction, LibrarySettings } from './types';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -93,11 +94,20 @@ export const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [userTransactions, setUserTransactions] = useState<Transaction[]>([]);
   
-  // Persisted user session state
+  // Persisted user session state - re-validate role from IndexedDB on restore
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem('digitalib_current_user');
-      return saved ? JSON.parse(saved) : null;
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      // Re-validate role from IndexedDB to prevent localStorage tampering
+      getUserByNIS(parsed.nis).then((dbUser) => {
+        if (dbUser && dbUser.role !== parsed.role) {
+          setCurrentUser({ ...parsed, role: dbUser.role });
+          localStorage.setItem('digitalib_current_user', JSON.stringify({ ...parsed, role: dbUser.role }));
+        }
+      });
+      return parsed;
     } catch (e) {
       return null;
     }
@@ -117,7 +127,6 @@ export const App: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isStudentCardOpen, setIsStudentCardOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPDFReaderOpen, setIsPDFReaderOpen] = useState(false);
   const [selectedPDFBook, setSelectedPDFBook] = useState<Book | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -134,11 +143,13 @@ export const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto Toast Helper
+  // Auto Toast Helper with cleanup
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4000);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 4000);
   };
 
   // Load Data from IndexedDB
@@ -158,6 +169,8 @@ export const App: React.FC = () => {
       if (currentUser) {
         const studentT = await getStudentTransactionsFromDB(currentUser.nis);
         setUserTransactions(studentT);
+      } else {
+        setUserTransactions([]);
       }
     } catch (e) {
       console.error('[App] Error refreshing IndexedDB:', e);
@@ -183,8 +196,13 @@ export const App: React.FC = () => {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
   }, [refreshData]);
+
+  // Keep a ref to userTransactions to avoid stale closures in borrow/return handlers
+  const userTransactionsRef = useRef<Transaction[]>([]);
+  userTransactionsRef.current = userTransactions;
 
   // Handle Book Borrowing
   const handleBorrowBook = async (book: Book) => {
@@ -194,8 +212,8 @@ export const App: React.FC = () => {
       return;
     }
 
-    // Check Max Borrow Limit
-    const activeCount = userTransactions.filter((t) => t.status === 'DIPINJAM').length;
+    // Check Max Borrow Limit (use ref to avoid stale closure on rapid clicks)
+    const activeCount = userTransactionsRef.current.filter((t) => t.status === 'DIPINJAM').length;
     if (activeCount >= libraryPolicy.maxBorrowLimit) {
       showToast(
         `Batas maksimal pinjam adalah ${libraryPolicy.maxBorrowLimit} buku secara bersamaan. Harap kembalikan buku sebelumnya!`,
@@ -213,7 +231,7 @@ export const App: React.FC = () => {
       await createBorrowTransactionInDB(currentUser.nis, book, currentUser.nama);
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
       showToast(`Berhasil meminjam buku "${book.judul}"!`, 'success');
-      refreshData();
+      await refreshData();
     } catch (e) {
       showToast('Gagal memproses peminjaman.', 'error');
     }
@@ -224,7 +242,7 @@ export const App: React.FC = () => {
     try {
       await createReturnTransactionInDB(txId);
       showToast('Pengembalian buku berhasil diproses dan stok telah diperbarui!', 'success');
-      refreshData();
+      await refreshData();
     } catch (e) {
       showToast('Gagal memproses pengembalian.', 'error');
     }
@@ -236,7 +254,7 @@ export const App: React.FC = () => {
     const matchedBook = books.find((b) => b.isbn === code || b.id === code);
     if (matchedBook) {
       if (currentUser) {
-        handleBorrowBook(matchedBook);
+        await handleBorrowBook(matchedBook);
       } else {
         showToast(`Buku terdeteksi: "${matchedBook.judul}". Silakan masuk untuk finalisasi peminjaman.`, 'info');
         setIsAuthOpen(true);
@@ -258,8 +276,9 @@ export const App: React.FC = () => {
     showToast(`Kode terdeteksi: ${code}. Tidak cocok dengan katalog.`, 'info');
   };
 
-  // Trigger Manual GAS Sync
+  // Trigger Manual GAS Sync (with concurrency guard)
   const handleManualSync = async () => {
+    if (isSyncing) return; // Prevent concurrent sync
     setIsSyncing(true);
     try {
       const res = await syncPendingQueueToGAS();
@@ -268,7 +287,7 @@ export const App: React.FC = () => {
       } else {
         showToast(res.message, 'info');
       }
-      refreshData();
+      await refreshData();
     } catch (e) {
       showToast('Gagal terhubung ke Google Apps Script.', 'error');
     } finally {
@@ -310,7 +329,7 @@ export const App: React.FC = () => {
 
       {/* Floating Notification Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
+        <div className="fixed bottom-20 right-6 z-50 animate-slide-up">
           <div
             className={`px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border flex items-center gap-3 text-xs font-bold ${
               toastMessage.type === 'success'

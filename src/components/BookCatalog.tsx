@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -37,7 +37,20 @@ export const BookCatalog: React.FC<BookCatalogProps> = ({
   const [typeFilter, setTypeFilter] = useState<'All' | 'Fisik' | 'E-book'>('All');
   const [categoryFilter, setCategoryFilter] = useState<string>('Semua');
   const [selectedBookDetail, setSelectedBookDetail] = useState<Book | null>(null);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+
+  // Close book detail on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedBookDetail) {
+        setSelectedBookDetail(null);
+      }
+    };
+    if (selectedBookDetail) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedBookDetail]);
 
   // Extract unique categories for filter
   const categories = useMemo(() => {
@@ -124,7 +137,7 @@ export const BookCatalog: React.FC<BookCatalogProps> = ({
               <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
               <h2 className="text-sm font-extrabold text-slate-900">Rekomendasi Utama</h2>
             </div>
-            <span className="text-[11px] font-bold text-emerald-600 cursor-pointer">Lihat Semua</span>
+            <span className="text-[11px] font-bold text-slate-400 cursor-default opacity-60">Lihat Semua</span>
           </div>
 
           <div className="flex gap-3.5 overflow-x-auto pb-2 scrollbar-none snap-x">
@@ -384,9 +397,17 @@ export const BookCatalog: React.FC<BookCatalogProps> = ({
                 )}
 
                 <button
-                  onClick={() => setIsBookmarked(!isBookmarked)}
+                  onClick={() => {
+                    const newSet = new Set(bookmarkedIds);
+                    if (newSet.has(selectedBookDetail.id)) {
+                      newSet.delete(selectedBookDetail.id);
+                    } else {
+                      newSet.add(selectedBookDetail.id);
+                    }
+                    setBookmarkedIds(newSet);
+                  }}
                   className={`p-3 rounded-2xl border transition ${
-                    isBookmarked
+                    bookmarkedIds.has(selectedBookDetail.id)
                       ? 'bg-amber-500 text-white border-amber-500'
                       : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
                   }`}

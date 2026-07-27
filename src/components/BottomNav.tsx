@@ -20,7 +20,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onOpenAuth,
 }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 max-w-md md:max-w-xl lg:max-w-2xl mx-auto sm:rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 max-w-md md:max-w-4xl lg:max-w-5xl mx-auto sm:rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
       <div className="flex items-center justify-around h-16 px-2">
         
         {/* Tab 1: Katalog */}
@@ -51,7 +51,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <Clock className="w-5 h-5 mb-0.5 text-emerald-600" />
+          <Clock className={`w-5 h-5 mb-0.5 ${activeTab === 'my-loans' ? 'text-emerald-600' : ''}`} />
           <span className="text-[10px]">Pinjaman</span>
         </button>
 
@@ -77,7 +77,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           }}
           className="flex flex-col items-center justify-center flex-1 py-1.5 text-slate-500 hover:text-emerald-600 transition-all"
         >
-          <QrCode className="w-5 h-5 mb-0.5 text-emerald-600" />
+          <QrCode className="w-5 h-5 mb-0.5" />
           <span className="text-[10px]">Kartu QR</span>
         </button>
 

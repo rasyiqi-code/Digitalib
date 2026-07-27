@@ -142,7 +142,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.nis}`
             }
             alt={currentUser.nama}
-            className="w-22 h-22 rounded-full object-cover ring-4 ring-emerald-500/20 shadow-md border-2 border-white group-hover:opacity-90 transition"
+            className="w-20 h-20 rounded-full object-cover ring-4 ring-emerald-500/20 shadow-md border-2 border-white group-hover:opacity-90 transition"
           />
           <button
             type="button"

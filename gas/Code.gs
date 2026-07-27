@@ -87,13 +87,13 @@ function doGet(e) {
       responseData = {
         status: "success",
         books: getSheetDataNormalized(SHEET_BUKU),
-        users: getSheetDataNormalized(SHEET_USERS),
+        users: getUsersSafe(),
         transactions: getSheetDataNormalized(SHEET_TRANSAKSI)
       };
     } else if (action === "getBooks") {
       responseData = { status: "success", books: getSheetDataNormalized(SHEET_BUKU) };
     } else if (action === "getUsers") {
-      responseData = { status: "success", users: getSheetDataNormalized(SHEET_USERS) };
+      responseData = { status: "success", users: getUsersSafe() };
     } else if (action === "getTransactions") {
       responseData = { status: "success", transactions: getSheetDataNormalized(SHEET_TRANSAKSI) };
     } else {
@@ -125,6 +125,9 @@ function doPost(e) {
   let responseData = { status: "error", message: "Gagal memproses request" };
 
   try {
+    if (!e.postData || !e.postData.contents) {
+      return createJsonResponse({ status: "error", message: "Request body kosong." });
+    }
     const contents = JSON.parse(e.postData.contents);
     const action = contents.action;
 
@@ -162,6 +165,17 @@ function handleUploadPdfToDrive(payload) {
     const { fileName, base64Data } = payload;
     if (!fileName || !base64Data) {
       return { status: "error", message: "Parameter fileName dan base64Data wajib diisi." };
+    }
+
+    // Validate file name has .pdf extension
+    if (!fileName.toLowerCase().endsWith('.pdf')) {
+      return { status: "error", message: "Hanya file PDF yang diizinkan." };
+    }
+
+    // Validate file size (max 50MB)
+    const estimatedSize = (base64Data.length * 3) / 4;
+    if (estimatedSize > 50 * 1024 * 1024) {
+      return { status: "error", message: "Ukuran file melebihi batas maksimum 50MB." };
     }
 
     // Find or create Google Drive target folder
@@ -258,13 +272,24 @@ function handleEditBook(payload) {
   return { status: "error", message: "ID Buku tidak ditemukan." };
 }
 
-// Action: Delete Book from DB_Buku
+// Action: Delete Book from DB_Buku (with active borrow check)
 function handleDeleteBook(payload) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_BUKU);
   if (!sheet) return { status: "error", message: "Sheet DB_Buku tidak ditemukan." };
 
   const data = sheet.getDataRange().getValues();
   const bookId = payload.id;
+
+  // Check for active borrows of this book
+  const sheetTx = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TRANSAKSI);
+  if (sheetTx) {
+    const txData = sheetTx.getDataRange().getValues();
+    for (let i = 1; i < txData.length; i++) {
+      if (String(txData[i][3]) === String(bookId) && String(txData[i][9]).trim() === "DIPINJAM") {
+        return { status: "error", message: "Buku tidak dapat dihapus karena masih ada transaksi peminjaman aktif!" };
+      }
+    }
+  }
 
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(bookId)) {
@@ -297,13 +322,39 @@ function getSheetDataNormalized(sheetName) {
   return result;
 }
 
+// Helper: Get users with PINs stripped for safe external consumption
+function getUsersSafe() {
+  const users = getSheetDataNormalized(SHEET_USERS);
+  return users.map(function(u) {
+    var safe = Object.assign({}, u);
+    delete safe.pin;
+    delete safe.PIN;
+    return safe;
+  });
+}
+
 // Action: Login Handler
 function handleLogin(payload) {
   const { nis, pin } = payload;
+  if (!nis || !pin) {
+    return { status: "error", message: "NIS dan PIN wajib diisi!" };
+  }
+
+  // Rate limiting: max 5 login attempts per minute per NIS
+  const cache = CacheService.getScriptCache();
+  const attemptKey = "login_attempts_" + String(nis);
+  const attempts = parseInt(cache.get(attemptKey) || "0", 10);
+  if (attempts >= 5) {
+    return { status: "error", message: "Terlalu banyak percobaan login. Coba lagi dalam 1 menit." };
+  }
+  cache.put(attemptKey, String(attempts + 1), 60); // 60 second TTL
+
   const users = getSheetDataNormalized(SHEET_USERS);
   const user = users.find(u => String(u.nis || u.NIS) === String(nis) && String(u.pin || u.PIN) === String(pin));
 
+  // Reset attempts on successful login
   if (user) {
+    cache.remove(attemptKey);
     return {
       status: "success",
       user: {
@@ -326,6 +377,36 @@ function handleBorrowBook(payload) {
 
   if (!sheetBuku || !sheetTx) {
     return { status: "error", message: "Sheet database tidak ditemukan. Jalankan setupDatabaseSheets()." };
+  }
+
+  // Read library settings for maxBorrowDays and maxBorrowLimit
+  var maxBorrowDays = 7;
+  var maxBorrowLimit = 3;
+  var sheetSettings = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_SETTINGS);
+  if (sheetSettings) {
+    var settingsData = sheetSettings.getDataRange().getValues();
+    for (var s = 1; s < settingsData.length; s++) {
+      if (String(settingsData[s][0]) === "library_policy_settings") {
+        try {
+          var policy = JSON.parse(String(settingsData[s][1]));
+          if (policy.maxBorrowDays) maxBorrowDays = Number(policy.maxBorrowDays);
+          if (policy.maxBorrowLimit) maxBorrowLimit = Number(policy.maxBorrowLimit);
+        } catch(e) {}
+        break;
+      }
+    }
+  }
+
+  // Enforce maxBorrowLimit in backend
+  var activeBorrowCount = 0;
+  var txDataAll = sheetTx.getDataRange().getValues();
+  for (var t = 1; t < txDataAll.length; t++) {
+    if (String(txDataAll[t][1]) === String(nis) && String(txDataAll[t][9]).trim() === "DIPINJAM") {
+      activeBorrowCount++;
+    }
+  }
+  if (activeBorrowCount >= maxBorrowLimit) {
+    return { status: "error", message: "Batas maksimal pinjam " + maxBorrowLimit + " buku tercapai!" };
   }
 
   const bukuData = sheetBuku.getDataRange().getValues();
@@ -360,7 +441,7 @@ function handleBorrowBook(payload) {
   // Record Transaction
   const txId = "TX" + Date.now();
   const datePinjam = new Date().toISOString();
-  const dateMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const dateMax = new Date(Date.now() + maxBorrowDays * 24 * 60 * 60 * 1000).toISOString();
   sheetTx.appendRow([txId, nis, userNama, bookId, bookTitle, bookType, datePinjam, dateMax, "", "DIPINJAM"]);
 
   return {
@@ -384,17 +465,25 @@ function handleReturnBook(payload) {
   let targetBookId = bookId;
 
   for (let i = 1; i < txData.length; i++) {
-    if (String(dataMatch(txData[i][0]), String(transactionId))) {
+    if (dataMatch(txData[i][0], transactionId)) {
       txRow = i + 1;
       targetBookId = txData[i][3];
       break;
     }
   }
 
-  if (txRow !== -1) {
-    sheetTx.getRange(txRow, 9).setValue(new Date().toISOString()); // tglDikembalikan
-    sheetTx.getRange(txRow, 10).setValue("DIKEMBALIKAN"); // status
+  if (txRow === -1) {
+    return { status: "error", message: "Transaksi peminjaman tidak ditemukan!" };
   }
+
+  // Check if already returned
+  const currentStatus = String(txData[txRow - 1][9] || "").trim();
+  if (currentStatus === "DIKEMBALIKAN") {
+    return { status: "error", message: "Buku ini sudah dikembalikan sebelumnya!" };
+  }
+
+  sheetTx.getRange(txRow, 9).setValue(new Date().toISOString()); // tglDikembalikan
+  sheetTx.getRange(txRow, 10).setValue("DIKEMBALIKAN"); // status
 
   // Increase stock back if physical book
   if (targetBookId) {

@@ -52,6 +52,7 @@ export async function loginUser(nis: string, pin: string): Promise<{ success: bo
   }
 
   // Default System Master Super Admin Account Fallback
+  // NOTE: PIN should be changed on first login via admin panel
   if (nis === '99999999' && pin === '888888') {
     const masterAdmin: User = {
       nis: '99999999',
@@ -61,6 +62,11 @@ export async function loginUser(nis: string, pin: string): Promise<{ success: bo
       role: 'super_admin',
       avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250',
     };
+    // Still check IndexedDB first to get latest role data
+    const dbUser = await getUserByNIS(nis);
+    if (dbUser) {
+      return { success: true, user: dbUser };
+    }
     return { success: true, user: masterAdmin };
   }
 

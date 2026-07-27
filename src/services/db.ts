@@ -264,7 +264,7 @@ export async function getStudentTransactionsFromDB(nis: string): Promise<Transac
 export async function createBorrowTransactionInDB(nis: string, book: Book, userNama: string): Promise<Transaction> {
   const db = await getDB();
   const settings = await getLibrarySettings();
-  const txId = 'TX-' + Date.now();
+  const txId = 'TX-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   const datePinjam = new Date().toISOString();
   const maxDaysMs = (settings.maxBorrowDays || 7) * 24 * 60 * 60 * 1000;
   const dateKembaliMax = new Date(Date.now() + maxDaysMs).toISOString();
@@ -282,24 +282,29 @@ export async function createBorrowTransactionInDB(nis: string, book: Book, userN
     syncedToGAS: false,
   };
 
-  // 1. Save Transaction
-  await db.put('transactions', newTx);
+  // Atomic: all writes in a single transaction
+  const idbTx = db.transaction(['transactions', 'books', 'sync_queue'], 'readwrite');
+  await idbTx.objectStore('transactions').put(newTx);
 
-  // 2. Decrement physical stock
-  if (book.tipe === 'Fisik' && book.stok > 0) {
-    const updatedBook = { ...book, stok: book.stok - 1 };
-    await db.put('books', updatedBook);
+  // Decrement physical stock (read fresh data from the same IDB transaction to avoid race)
+  if (book.tipe === 'Fisik') {
+    const freshBook = await idbTx.objectStore('books').get(book.id);
+    if (freshBook && freshBook.stok > 0) {
+      const updatedBook = { ...freshBook, stok: freshBook.stok - 1 };
+      await idbTx.objectStore('books').put(updatedBook);
+    }
   }
 
-  // 3. Add to sync queue
+  // Add to sync queue
   const queueItem: SyncQueueItem = {
-    id: 'SYNC-' + Date.now(),
+    id: 'SYNC-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
     type: 'borrow',
     data: { nis, bookId: book.id, userNama },
     timestamp: new Date().toISOString(),
     status: 'pending',
   };
-  await db.put('sync_queue', queueItem);
+  await idbTx.objectStore('sync_queue').put(queueItem);
+  await idbTx.done;
 
   return newTx;
 }
@@ -308,29 +313,34 @@ export async function createReturnTransactionInDB(transactionId: string): Promis
   const db = await getDB();
   const tx = await db.get('transactions', transactionId);
   if (!tx) return;
+  if (tx.status === 'DIKEMBALIKAN') return; // Already returned, prevent duplicate
 
   tx.status = 'DIKEMBALIKAN';
   tx.tglDikembalikan = new Date().toISOString();
   tx.syncedToGAS = false;
 
-  await db.put('transactions', tx);
-
   // Re-increment stock if physical
   const book = await db.get('books', tx.bookId);
+
+  // Atomic: all writes in a single transaction
+  const idbTx = db.transaction(['transactions', 'books', 'sync_queue'], 'readwrite');
+  await idbTx.objectStore('transactions').put(tx);
+
   if (book && book.tipe === 'Fisik') {
     book.stok += 1;
-    await db.put('books', book);
+    await idbTx.objectStore('books').put(book);
   }
 
   // Add to sync queue
   const queueItem: SyncQueueItem = {
-    id: 'SYNC-' + Date.now(),
+    id: 'SYNC-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
     type: 'return',
     data: { transactionId: tx.id, bookId: tx.bookId },
     timestamp: new Date().toISOString(),
     status: 'pending',
   };
-  await db.put('sync_queue', queueItem);
+  await idbTx.objectStore('sync_queue').put(queueItem);
+  await idbTx.done;
 }
 
 // Sync Queue operations
@@ -351,6 +361,7 @@ export async function clearAllLocalData(): Promise<void> {
   await db.clear('users');
   await db.clear('transactions');
   await db.clear('sync_queue');
+  await db.clear('settings');
 }
 
 // Populate local IndexedDB from live GAS REST API

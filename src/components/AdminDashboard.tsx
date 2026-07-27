@@ -86,14 +86,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [activeTab]);
 
+  // Helper: Sanitize CSV cell to prevent formula injection
+  const sanitizeCsvCell = (val: string) => {
+    if (!val) return '""';
+    const dangerous = /^[=+\-@\t\r]/;
+    const safe = dangerous.test(val) ? "'" + val : val;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+
   // Helper: Export CSV Report
   const handleExportCSV = () => {
     const headers = ['ID Transaksi', 'NIS', 'Nama Siswa', 'Judul Buku', 'Tipe', 'Tanggal Pinjam', 'Batas Kembalikan', 'Status'];
     const rows = transactions.map((t) => [
       t.id,
       t.nis,
-      `"${t.namaSiswa || 'Siswa'}"`,
-      `"${t.judulBuku}"`,
+      sanitizeCsvCell(t.namaSiswa || 'Siswa'),
+      sanitizeCsvCell(t.judulBuku),
       t.tipeBuku,
       new Date(t.tglPinjam).toLocaleDateString('id-ID'),
       new Date(t.tglKembaliMax).toLocaleDateString('id-ID'),
@@ -134,6 +142,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSaveUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userNis || !userNama || !userPin) return;
+    if (userPin.length < 4) {
+      alert('PIN harus minimal 4 digit!');
+      return;
+    }
 
     await saveUserToDB({
       nis: userNis,
@@ -189,7 +201,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!newJudul || !newIsbn) return;
 
     const bookToSave: Book = {
-      id: editingBookId || 'B' + Date.now().toString().slice(-4),
+      id: editingBookId || 'B-' + Date.now().toString() + '-' + Math.random().toString(36).slice(2, 6),
       isbn: newIsbn,
       judul: newJudul,
       pengarang: newPengarang || 'Anonim',
@@ -502,7 +514,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     />
                     <div>
                       <div className="font-bold text-slate-900">{u.nama}</div>
-                      <div className="text-[10px] text-slate-500">NIS: {u.nis} • Kelas: {u.kelas} • PIN: {u.pin}</div>
+                      <div className="text-[10px] text-slate-500">NIS: {u.nis} • Kelas: {u.kelas}</div>
                     </div>
                   </div>
 
@@ -548,7 +560,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="relative w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-200">
             <button
               onClick={() => setIsUserModalOpen(false)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900"
+              className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900 transition"
             >
               <X className="w-4 h-4" />
             </button>
@@ -568,7 +580,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   placeholder="Contoh: 10239481"
                   value={userNis}
                   onChange={(e) => setUserNis(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium disabled:opacity-60"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-60"
                 />
               </div>
 
@@ -580,7 +592,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   placeholder="Nama Lengkap Siswa/Admin"
                   value={userNama}
                   onChange={(e) => setUserNama(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                 />
               </div>
 
@@ -592,19 +604,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     placeholder="Contoh: XII IPA 1"
                     value={userKelas}
                     onChange={(e) => setUserKelas(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                   />
                 </div>
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">PIN Akses (Password)</label>
                   <input
-                    type="text"
+                    type="password"
                     required
-                    placeholder="Contoh: 123456"
+                    placeholder="Minimal 4 digit"
                     value={userPin}
                     onChange={(e) => setUserPin(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                   />
                 </div>
               </div>
@@ -614,7 +626,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <select
                   value={userRole}
                   onChange={(e) => setUserRole(e.target.value as any)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                 >
                   <option value="siswa">🎓 Siswa (Anggota Biasa)</option>
                   <option value="admin">🛡️ Pustakawan (Admin Sirkulasi)</option>
@@ -639,7 +651,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="relative w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-200">
             <button
               onClick={() => setIsBookModalOpen(false)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900"
+              className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900 transition"
             >
               <X className="w-4 h-4" />
             </button>
@@ -658,7 +670,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   placeholder="Judul Buku"
                   value={newJudul}
                   onChange={(e) => setNewJudul(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                 />
               </div>
 
@@ -669,7 +681,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   placeholder="Nama Pengarang"
                   value={newPengarang}
                   onChange={(e) => setNewPengarang(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                 />
               </div>
 
@@ -691,7 +703,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <select
                     value={newKategori}
                     onChange={(e) => setNewKategori(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                   >
                     <option value="Novel / Sastra">Novel / Sastra</option>
                     <option value="Sains & Teknologi">Sains & Teknologi</option>
@@ -709,7 +721,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <select
                     value={newTipe}
                     onChange={(e) => setNewTipe(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                   >
                     <option value="Fisik">📚 Buku Fisik</option>
                     <option value="E-book">📄 E-Book Digital</option>
@@ -723,7 +735,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     min={1}
                     value={newStok}
                     onChange={(e) => setNewStok(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                   />
                 </div>
               </div>
@@ -736,7 +748,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     placeholder="https://domain.com/buku.pdf"
                     value={newPdfUrl}
                     onChange={(e) => setNewPdfUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                   />
                 </div>
               )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Download, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Bookmark, ShieldCheck, FileText, ArrowLeft } from 'lucide-react';
 import { Book } from '../types';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -17,33 +17,56 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({ isOpen, onClose,
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
+  // Reset reader state when switching books
+  useEffect(() => {
+    setCurrentPage(1);
+    setZoomLevel(100);
+    setIsBookmarked(false);
+  }, [book?.id]);
+
   if (!isOpen || !book) return null;
 
   const handleDownloadForOffline = async () => {
     setIsDownloading(true);
+    let downloaded = false;
     try {
       // Use Capacitor Filesystem to download/save offline if on native mobile device
       if (book.pdfUrl) {
         try {
-          await Filesystem.writeFile({
-            path: `digitalib_ebook_${book.id}.pdf`,
-            data: book.pdfUrl,
-            directory: Directory.Data,
-          });
+          const response = await fetch(book.pdfUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            const reader = new FileReader();
+            const base64Data = await new Promise<string>((resolve, reject) => {
+              reader.onloadend = () => {
+                const result = reader.result as string;
+                const base64 = result.split(',')[1] || result;
+                resolve(base64);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            await Filesystem.writeFile({
+              path: `digitalib_ebook_${book.id}.pdf`,
+              data: base64Data,
+              directory: Directory.Data,
+            });
+            downloaded = true;
+          }
         } catch (capErr) {
           console.log('[Filesystem] Fallback to browser download link:', capErr);
         }
       }
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 3000);
+      if (downloaded) {
+        setDownloadSuccess(true);
+        setTimeout(() => setDownloadSuccess(false), 3000);
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setIsDownloading(false);
     }
   };
-
-  if (!isOpen || !book) return null;
 
   // Helper to format PDF URLs for inline iframe previewing (prevents browser auto-download)
   const getEmbedUrl = (rawUrl?: string) => {
@@ -188,7 +211,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({ isOpen, onClose,
               src={embedPdfUrl}
               className="w-full h-[calc(100%+56px)] -mt-14 border-0 bg-white"
               title={`E-Book Reader - ${book.judul}`}
-              allow="autoplay"
+              sandbox="allow-same-origin"
             />
           </div>
         ) : (

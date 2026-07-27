@@ -122,7 +122,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
                     `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.nis}`
                   }
                   alt={user.nama}
-                  className="w-18 h-22 rounded-xl object-cover border-2 border-emerald-600 shadow-xs bg-slate-100"
+                  className="w-[4.5rem] h-[5.5rem] rounded-xl object-cover border-2 border-emerald-600 shadow-xs bg-slate-100"
                 />
                 <div className="absolute -bottom-1 -right-1 p-1 rounded-full bg-emerald-600 text-white shadow-xs">
                   <ShieldCheck className="w-3 h-3" />

@@ -25,34 +25,40 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
 
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const hasScannedRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
       setScannedFeedback(null);
       setCameraError(null);
+      hasScannedRef.current = false;
       return;
     }
 
     const codeReader = new BrowserMultiFormatReader();
     codeReaderRef.current = codeReader;
 
-    // List cameras
+    // List cameras and start after device is resolved
     codeReader
       .listVideoInputDevices()
       .then((devices) => {
         setVideoDevices(devices);
-        if (devices.length > 0 && !selectedDeviceId) {
-          // Prefer back camera if available
-          const backCam = devices.find(
-            (d) => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment')
-          );
-          setSelectedDeviceId(backCam ? backCam.deviceId : devices[0].deviceId);
+        if (devices.length > 0) {
+          const targetId = selectedDeviceId || (() => {
+            const backCam = devices.find(
+              (d) => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment')
+            );
+            return backCam ? backCam.deviceId : devices[0].deviceId;
+          })();
+          setSelectedDeviceId(targetId);
+          startCamera(targetId);
         }
       })
-      .catch((err) => console.warn('[Scanner] Failed to list devices:', err));
-
-    startCamera(selectedDeviceId);
+      .catch((err) => {
+        console.warn('[Scanner] Failed to list devices:', err);
+        startCamera(null);
+      });
 
     return () => {
       stopCamera();
@@ -117,14 +123,18 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
+      // Close AudioContext after beep completes to prevent memory leak
+      osc.onended = () => ctx.close();
     } catch (e) {
       // Audio context fallback
     }
   };
 
   const handleDetectedCode = (code: string) => {
+    if (hasScannedRef.current) return; // Prevent duplicate scans
     const cleanCode = code.trim();
     if (!cleanCode) return;
+    hasScannedRef.current = true;
 
     playBeepSound();
     setScannedFeedback(`Terdeteksi: ${cleanCode}`);

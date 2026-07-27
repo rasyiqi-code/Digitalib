@@ -76,17 +76,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   const handleFetchDataGAS = async () => {
     setIsFetchingGAS(true);
     setTestResult(null);
-    const res = await fetchInitialDataFromGAS();
-    setTestResult(res.message);
-    setIsFetchingGAS(false);
-    if (res.success) {
-      onConfigSaved();
+    try {
+      const res = await fetchInitialDataFromGAS();
+      setTestResult(res.message);
+      if (res.success) {
+        onConfigSaved();
+      }
+    } catch (e: any) {
+      setTestResult('Gagal menarik data dari Google Sheets.');
+    } finally {
+      setIsFetchingGAS(false);
     }
   };
 
   const handleResetDatabase = async () => {
     if (window.confirm('Apakah Anda yakin ingin mengosongkan seluruh data lokal IndexedDB? (Data demo/lokal akan dihapus)')) {
       await clearAllLocalData();
+      localStorage.removeItem('digitalib_current_user');
       setTestResult('Database lokal berhasil dikosongkan.');
       onConfigSaved();
     }
@@ -296,7 +302,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
 
           {/* Test Result Alert */}
           {testResult && (
-            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 font-medium">
+            <div className={`p-2.5 rounded-xl border text-[11px] font-medium ${
+              testResult.includes('Gagal') || testResult.includes('Gagal')
+                ? 'bg-red-50 border-red-200 text-red-800'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            }`}>
               {testResult}
             </div>
           )}
