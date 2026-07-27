@@ -27,12 +27,14 @@ interface UserProfileViewProps {
 }
 
 const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=300',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=SiswaPelajar1',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=SiswaPelajar2',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=CendekiawanSekolah',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=PustakawanPro',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=DigiBotPerpus',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=SiswaJuara3',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=SiswaKreatif4',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=KepalaPerpusAdmin',
 ];
 
 export const UserProfileView: React.FC<UserProfileViewProps> = ({
@@ -375,7 +377,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span>Atau Pilih Avatar Preset:</span>
               </div>
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-4 gap-2">
                 {AVATAR_PRESETS.map((presetUrl, idx) => (
                   <button
                     key={idx}
