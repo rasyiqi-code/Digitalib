@@ -134,3 +134,30 @@ export async function fetchInitialDataFromGAS(): Promise<{ success: boolean; mes
     return { success: false, message: 'Gagal terhubung ke Google Apps Script API.' };
   }
 }
+
+// Upload PDF E-Book File directly to Google Drive via GAS API
+export async function uploadPdfFileToGASDrive(fileName: string, base64Data: string): Promise<{ success: boolean; pdfUrl?: string; message: string }> {
+  const config = await getConfig();
+  if (!config.gasUrl) {
+    return { success: false, message: 'URL Web App Google Apps Script belum dikonfigurasi di Pengaturan.' };
+  }
+
+  try {
+    const res = await fetch(config.gasUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'uploadPdfToDrive',
+        payload: { fileName, base64Data },
+      }),
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.pdfUrl) {
+      return { success: true, pdfUrl: data.pdfUrl, message: data.message };
+    } else {
+      return { success: false, message: data.message || 'Gagal mengunggah PDF ke Google Drive.' };
+    }
+  } catch (err: any) {
+    return { success: false, message: 'Gagal terhubung ke Google Drive API: ' + (err.message || err) };
+  }
+}

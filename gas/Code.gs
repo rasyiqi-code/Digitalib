@@ -1,46 +1,101 @@
 /**
  * ============================================================================
- * DIGITALIB - GOOGLE APPS SCRIPT REST API BACKEND
- * System Perpustakaan Hybrid Sekolah Berbasis Google Sheets
+ * DIGITALIB - GOOGLE APPS SCRIPT REST API BACKEND (HYBRID SYSTEM)
+ * System Perpustakaan Hybrid Sekolah Berbasis Google Sheets & Google Drive
  * ============================================================================
  * 
- * CARA DEPLOYMENT:
+ * CARA DEPLOYMENT LENGKAP:
  * 1. Buka Google Sheets baru.
- * 2. Buat 3 Sheet: DB_Users, DB_Buku, DB_Transaksi
- *    - Sheet DB_Users (Kolom A-D): NIS, Nama, Kelas, PIN, Role
- *    - Sheet DB_Buku (Kolom A-F): ID, ISBN, Judul, Pengarang, Stok, Tipe (Fisik/Ebook), PDF_URL
- *    - Sheet DB_Transaksi (Kolom A-G): ID, NIS, BookID, JudulBuku, Tipe, TglPinjam, Status (DIPINJAM/DIKEMBALIKAN)
- * 3. Ekstensi -> Apps Script -> Paste kode di bawah ini.
+ * 2. Ekstensi -> Apps Script -> Paste seluruh kode di bawah ini.
+ * 3. Jalankan fungsi "setupDatabaseSheets()" sekali untuk membuat sheet & header otomatis.
  * 4. Deploy -> New Deployment -> Select type: Web app.
- *    - Execute as: Me
+ *    - Execute as: Me (email Anda)
  *    - Who has access: Anyone
  * 5. Salin URL Web App yang dihasilkan dan tempel di Pengaturan Aplikasi DigiTalib.
  */
 
-const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 const SHEET_USERS = "DB_Users";
 const SHEET_BUKU = "DB_Buku";
 const SHEET_TRANSAKSI = "DB_Transaksi";
+const SHEET_SETTINGS = "DB_Settings";
+
+// Target Google Drive Folder Name for Uploaded E-Books
+const EBOOK_FOLDER_NAME = "DigiTalib_Ebooks_Storage";
+
+/**
+ * 🛠️ Inisialisasi Otomatis Sheet & Kolom Header
+ * Jalankan fungsi ini sekali di Google Apps Script Editor untuk membuat sheet otomatis.
+ */
+function setupDatabaseSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. DB_Users Sheet
+  let sUsers = ss.getSheetByName(SHEET_USERS);
+  if (!sUsers) {
+    sUsers = ss.insertSheet(SHEET_USERS);
+    sUsers.appendRow(["nis", "nama", "kelas", "pin", "role", "email"]);
+    sUsers.appendRow(["99999999", "Kepala Perpustakaan", "Super Admin", "888888", "super_admin", "admin@sch.id"]);
+  }
+
+  // 2. DB_Buku Sheet
+  let sBuku = ss.getSheetByName(SHEET_BUKU);
+  if (!sBuku) {
+    sBuku = ss.insertSheet(SHEET_BUKU);
+    sBuku.appendRow(["id", "isbn", "judul", "pengarang", "kategori", "stok", "tipe", "pdfUrl", "deskripsi", "tahunTerbit", "coverImage"]);
+    sBuku.appendRow([
+      "BK-001",
+      "978602033176",
+      "Fisika Kuantum & Algoritma Modern",
+      "Dr. Ir. Hendra Wijaya",
+      "Sains & Teknologi",
+      10,
+      "E-book",
+      "https://drive.google.com/file/d/1234567890/view",
+      "Panduan komprehensif tentang mekanika kuantum.",
+      2024,
+      "https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=400"
+    ]);
+  }
+
+  // 3. DB_Transaksi Sheet
+  let sTx = ss.getSheetByName(SHEET_TRANSAKSI);
+  if (!sTx) {
+    sTx = ss.insertSheet(SHEET_TRANSAKSI);
+    sTx.appendRow(["id", "nis", "namaSiswa", "bookId", "judulBuku", "tipeBuku", "tglPinjam", "tglKembaliMax", "tglDikembalikan", "status"]);
+  }
+
+  // 4. DB_Settings Sheet
+  let sSet = ss.getSheetByName(SHEET_SETTINGS);
+  if (!sSet) {
+    sSet = ss.insertSheet(SHEET_SETTINGS);
+    sSet.appendRow(["key", "value"]);
+    sSet.appendRow(["library_policy_settings", JSON.stringify({ maxBorrowDays: 7, maxBorrowLimit: 3, finePerDay: 1000, enableOverdueNotifications: true })]);
+  }
+
+  return "Setup Database Sheets Berhasil!";
+}
 
 // Main GET Endpoint
 function doGet(e) {
-  const action = e.parameter.action;
+  const action = e.parameter ? e.parameter.action : "";
   let responseData = { status: "error", message: "Action tidak dikenal" };
 
   try {
     if (action === "getInitialData") {
       responseData = {
         status: "success",
-        books: getSheetData(SHEET_BUKU),
-        users: getSheetData(SHEET_USERS),
-        transactions: getSheetData(SHEET_TRANSAKSI)
+        books: getSheetDataNormalized(SHEET_BUKU),
+        users: getSheetDataNormalized(SHEET_USERS),
+        transactions: getSheetDataNormalized(SHEET_TRANSAKSI)
       };
     } else if (action === "getBooks") {
-      responseData = { status: "success", books: getSheetData(SHEET_BUKU) };
+      responseData = { status: "success", books: getSheetDataNormalized(SHEET_BUKU) };
+    } else if (action === "getUsers") {
+      responseData = { status: "success", users: getSheetDataNormalized(SHEET_USERS) };
     } else if (action === "getTransactions") {
-      responseData = { status: "success", transactions: getSheetData(SHEET_TRANSAKSI) };
+      responseData = { status: "success", transactions: getSheetDataNormalized(SHEET_TRANSAKSI) };
     } else {
-      responseData = { status: "success", message: "API DigiTalib Aktif" };
+      responseData = { status: "success", message: "API DigiTalib Hybrid Aktif" };
     }
   } catch (err) {
     responseData = { status: "error", message: err.toString() };
@@ -49,10 +104,9 @@ function doGet(e) {
   return createJsonResponse(responseData);
 }
 
-// Main POST Endpoint (with LockService for Race Conditions)
+// Main POST Endpoint (with LockService for Concurrency Safety)
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  // Wait up to 10 seconds for lock
   if (!lock.tryLock(10000)) {
     return createJsonResponse({ status: "error", message: "Sistem sibuk, silakan coba beberapa saat lagi (Lock Timeout)." });
   }
@@ -73,6 +127,12 @@ function doPost(e) {
       responseData = handleReturnBook(contents.payload);
     } else if (action === "addBook") {
       responseData = handleAddBook(contents.payload);
+    } else if (action === "editBook") {
+      responseData = handleEditBook(contents.payload);
+    } else if (action === "deleteBook") {
+      responseData = handleDeleteBook(contents.payload);
+    } else if (action === "uploadPdfToDrive") {
+      responseData = handleUploadPdfToDrive(contents.payload);
     }
   } catch (err) {
     responseData = { status: "error", message: err.toString() };
@@ -83,8 +143,130 @@ function doPost(e) {
   return createJsonResponse(responseData);
 }
 
-// Helper: Convert Sheet to JSON Object Array
-function getSheetData(sheetName) {
+/**
+ * 📂 Upload File E-Book PDF Langsung ke Google Drive & Buat Akses Publik
+ */
+function handleUploadPdfToDrive(payload) {
+  try {
+    const { fileName, base64Data } = payload;
+    if (!fileName || !base64Data) {
+      return { status: "error", message: "Parameter fileName dan base64Data wajib diisi." };
+    }
+
+    // Find or create Google Drive target folder
+    let folder;
+    const folders = DriveApp.getFoldersByName(EBOOK_FOLDER_NAME);
+    if (folders.hasNext()) {
+      folder = folders.next();
+    } else {
+      folder = DriveApp.createFolder(EBOOK_FOLDER_NAME);
+      folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+
+    // Clean base64 prefix if present
+    let cleanBase64 = base64Data;
+    if (cleanBase64.includes(",")) {
+      cleanBase64 = cleanBase64.split(",")[1];
+    }
+
+    // Decode and create file in Drive
+    const blob = Utilities.newBlob(Utilities.base64Decode(cleanBase64), "application/pdf", fileName);
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const fileId = file.getId();
+    const previewUrl = "https://drive.google.com/file/d/" + fileId + "/preview";
+    const downloadUrl = file.getDownloadUrl();
+
+    return {
+      status: "success",
+      message: "File E-Book PDF berhasil diunggah ke Google Drive!",
+      fileId: fileId,
+      pdfUrl: previewUrl,
+      downloadUrl: downloadUrl
+    };
+  } catch (err) {
+    return { status: "error", message: "Gagal mengunggah file ke Google Drive: " + err.toString() };
+  }
+}
+
+// Action: Add New Book to DB_Buku
+function handleAddBook(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_BUKU);
+  if (!sheet) {
+    setupDatabaseSheets();
+    sheet = ss.getSheetByName(SHEET_BUKU);
+  }
+
+  const { id, isbn, judul, pengarang, kategori, stok, tipe, pdfUrl, deskripsi, tahunTerbit, coverImage } = payload;
+  const bookId = id || "BK-" + Date.now();
+
+  sheet.appendRow([
+    bookId,
+    isbn || "",
+    judul || "Buku Tanpa Judul",
+    pengarang || "Pengarang Tidak Diketahui",
+    kategori || "Umum",
+    Number(stok) || 1,
+    tipe || "Fisik",
+    pdfUrl || "",
+    deskripsi || "",
+    Number(tahunTerbit) || new Date().getFullYear(),
+    coverImage || ""
+  ]);
+
+  return { status: "success", message: "Buku berhasil ditambahkan ke catalog database!", bookId: bookId };
+}
+
+// Action: Edit Existing Book in DB_Buku
+function handleEditBook(payload) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_BUKU);
+  if (!sheet) return { status: "error", message: "Sheet DB_Buku tidak ditemukan." };
+
+  const data = sheet.getDataRange().getValues();
+  const { id, isbn, judul, pengarang, kategori, stok, tipe, pdfUrl, deskripsi, tahunTerbit, coverImage } = payload;
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      const row = i + 1;
+      sheet.getRange(row, 2).setValue(isbn || data[i][1]);
+      sheet.getRange(row, 3).setValue(judul || data[i][2]);
+      sheet.getRange(row, 4).setValue(pengarang || data[i][3]);
+      sheet.getRange(row, 5).setValue(kategori || data[i][4]);
+      sheet.getRange(row, 6).setValue(Number(stok) >= 0 ? Number(stok) : data[i][5]);
+      sheet.getRange(row, 7).setValue(tipe || data[i][6]);
+      sheet.getRange(row, 8).setValue(pdfUrl !== undefined ? pdfUrl : data[i][7]);
+      sheet.getRange(row, 9).setValue(deskripsi !== undefined ? deskripsi : data[i][8]);
+      sheet.getRange(row, 10).setValue(tahunTerbit !== undefined ? Number(tahunTerbit) : data[i][9]);
+      sheet.getRange(row, 11).setValue(coverImage !== undefined ? coverImage : data[i][10]);
+      return { status: "success", message: "Buku berhasil diperbarui!" };
+    }
+  }
+
+  return { status: "error", message: "ID Buku tidak ditemukan." };
+}
+
+// Action: Delete Book from DB_Buku
+function handleDeleteBook(payload) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_BUKU);
+  if (!sheet) return { status: "error", message: "Sheet DB_Buku tidak ditemukan." };
+
+  const data = sheet.getDataRange().getValues();
+  const bookId = payload.id;
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(bookId)) {
+      sheet.deleteRow(i + 1);
+      return { status: "success", message: "Buku berhasil dihapus dari database!" };
+    }
+  }
+
+  return { status: "error", message: "Buku tidak ditemukan." };
+}
+
+// Helper: Normalize Sheet Rows to Normalized JSON Objects
+function getSheetDataNormalized(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) return [];
   const data = sheet.getDataRange().getValues();
@@ -96,7 +278,8 @@ function getSheetData(sheetName) {
     let row = data[i];
     let obj = {};
     for (let j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j];
+      let key = String(headers[j]).trim();
+      obj[key] = row[j];
     }
     result.push(obj);
   }
@@ -106,18 +289,17 @@ function getSheetData(sheetName) {
 // Action: Login Handler
 function handleLogin(payload) {
   const { nis, pin } = payload;
-  const users = getSheetData(SHEET_USERS);
-  const user = users.find(u => String(u.NIS) === String(nis) && String(u.PIN) === String(pin));
+  const users = getSheetDataNormalized(SHEET_USERS);
+  const user = users.find(u => String(u.nis || u.NIS) === String(nis) && String(u.pin || u.PIN) === String(pin));
 
   if (user) {
     return {
       status: "success",
-      token: "TOKEN_" + user.NIS + "_" + Date.now(),
       user: {
-        nis: String(user.NIS),
-        nama: user.Nama,
-        kelas: user.Kelas,
-        role: user.Role || "Siswa"
+        nis: String(user.nis || user.NIS),
+        nama: user.nama || user.Nama,
+        kelas: user.kelas || user.Kelas,
+        role: user.role || user.Role || "siswa"
       }
     };
   } else {
@@ -125,11 +307,15 @@ function handleLogin(payload) {
   }
 }
 
-// Action: Borrow Book (Stock decrement + transaction logging)
+// Action: Borrow Book
 function handleBorrowBook(payload) {
   const { nis, bookId, userNama } = payload;
   const sheetBuku = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_BUKU);
   const sheetTx = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TRANSAKSI);
+
+  if (!sheetBuku || !sheetTx) {
+    return { status: "error", message: "Sheet database tidak ditemukan. Jalankan setupDatabaseSheets()." };
+  }
 
   const bukuData = sheetBuku.getDataRange().getValues();
   let foundRow = -1;
@@ -141,8 +327,8 @@ function handleBorrowBook(payload) {
     if (String(bukuData[i][0]) === String(bookId)) {
       foundRow = i + 1;
       bookTitle = bukuData[i][2]; // Judul
-      currentStock = Number(bukuData[i][4]); // Stok
-      bookType = bukuData[i][5] || "Fisik"; // Tipe
+      currentStock = Number(bukuData[i][5]); // Stok
+      bookType = bukuData[i][6] || "Fisik"; // Tipe
       break;
     }
   }
@@ -157,13 +343,14 @@ function handleBorrowBook(payload) {
 
   // Update Stock if Physical
   if (bookType === "Fisik") {
-    sheetBuku.getRange(foundRow, 5).setValue(currentStock - 1);
+    sheetBuku.getRange(foundRow, 6).setValue(currentStock - 1);
   }
 
   // Record Transaction
   const txId = "TX" + Date.now();
-  const dateStr = new Date().toISOString();
-  sheetTx.appendRow([txId, nis, bookId, bookTitle, bookType, dateStr, "DIPINJAM"]);
+  const datePinjam = new Date().toISOString();
+  const dateMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  sheetTx.appendRow([txId, nis, userNama, bookId, bookTitle, bookType, datePinjam, dateMax, "", "DIPINJAM"]);
 
   return {
     status: "success",
@@ -173,26 +360,29 @@ function handleBorrowBook(payload) {
   };
 }
 
-// Action: Return Book (Stock increment + transaction status update)
+// Action: Return Book
 function handleReturnBook(payload) {
   const { transactionId, bookId } = payload;
   const sheetTx = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_TRANSAKSI);
   const sheetBuku = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_BUKU);
+
+  if (!sheetTx || !sheetBuku) return { status: "error", message: "Database tidak ditemukan." };
 
   const txData = sheetTx.getDataRange().getValues();
   let txRow = -1;
   let targetBookId = bookId;
 
   for (let i = 1; i < txData.length; i++) {
-    if (String(txData[i][0]) === String(transactionId)) {
+    if (String(dataMatch(txData[i][0]), String(transactionId))) {
       txRow = i + 1;
-      targetBookId = txData[i][2];
+      targetBookId = txData[i][3];
       break;
     }
   }
 
   if (txRow !== -1) {
-    sheetTx.getRange(txRow, 7).setValue("DIKEMBALIKAN");
+    sheetTx.getRange(txRow, 9).setValue(new Date().toISOString()); // tglDikembalikan
+    sheetTx.getRange(txRow, 10).setValue("DIKEMBALIKAN"); // status
   }
 
   // Increase stock back if physical book
@@ -200,14 +390,18 @@ function handleReturnBook(payload) {
     const bukuData = sheetBuku.getDataRange().getValues();
     for (let i = 1; i < bukuData.length; i++) {
       if (String(bukuData[i][0]) === String(targetBookId)) {
-        const curStock = Number(bukuData[i][4]);
-        sheetBuku.getRange(i + 1, 5).setValue(curStock + 1);
+        const curStock = Number(bukuData[i][5]);
+        sheetBuku.getRange(i + 1, 6).setValue(curStock + 1);
         break;
       }
     }
   }
 
   return { status: "success", message: "Pengembalian buku berhasil diproses!" };
+}
+
+function dataMatch(val1, val2) {
+  return String(val1).trim() === String(val2).trim();
 }
 
 // Action: Batch Sync Offline Queue
@@ -217,10 +411,12 @@ function handleSyncBatch(payload) {
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (item.type === "borrow") {
-      results.push(handleBorrowBook(item.data));
-    } else if (item.type === "return") {
-      results.push(handleReturnBook(item.data));
+    if (item.type === "borrow" || item.action === "BORROW") {
+      results.push(handleBorrowBook(item.data || item.payload));
+    } else if (item.type === "return" || item.action === "RETURN") {
+      results.push(handleReturnBook(item.data || item.payload));
+    } else if (item.action === "ADD_BOOK") {
+      results.push(handleAddBook(item.payload));
     }
   }
 
