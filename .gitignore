@@ -20,6 +20,10 @@ android/app/build
 android/.gradle
 android/captures
 android/local.properties
+android-sdk
+*.jks
+*.keystore
+
 
 # Temp media / scratch
 .tempmediaStorage
