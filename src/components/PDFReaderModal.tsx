@@ -184,13 +184,10 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({ isOpen, onClose,
         {embedPdfUrl ? (
           /* Real Embedded PDF Document Viewer (Supports Google Drive / Direct PDF) */
           <div className="w-full h-full rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm relative">
-            {/* Top-Right Mask Overlay to hide Google Drive "Lepas / Open in New Window" Pop-out button */}
+            {/* Seamless Top-Right Mask Overlay to hide Google Drive "Lepas / Open in New Window" button */}
             <div 
-              className="absolute top-0 right-0 w-14 h-12 bg-white/95 backdrop-blur-xs z-10 pointer-events-auto rounded-bl-xl border-l border-b border-slate-200/50 flex items-center justify-center shadow-xs"
-              title="Perpustakaan Digital School Reader"
-            >
-              <div className="w-2 h-2 rounded-full bg-emerald-500/80" />
-            </div>
+              className="absolute top-0 right-0 w-16 h-14 bg-white z-10 pointer-events-auto"
+            />
 
             <iframe
               src={embedPdfUrl}
