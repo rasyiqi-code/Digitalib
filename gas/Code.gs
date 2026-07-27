@@ -77,11 +77,13 @@ function setupDatabaseSheets() {
 
 // Main GET Endpoint
 function doGet(e) {
-  const action = e.parameter ? e.parameter.action : "";
+  const action = (e && e.parameter) ? e.parameter.action : "";
   let responseData = { status: "error", message: "Action tidak dikenal" };
 
   try {
-    if (action === "getInitialData") {
+    if (!action || action === "" || action === "test") {
+      responseData = { status: "success", message: "API DigiTalib Hybrid Aktif & Siap Digunakan" };
+    } else if (action === "getInitialData") {
       responseData = {
         status: "success",
         books: getSheetDataNormalized(SHEET_BUKU),
@@ -102,6 +104,15 @@ function doGet(e) {
   }
 
   return createJsonResponse(responseData);
+}
+
+/**
+ * 🧪 Test Runner untuk Editor Google Apps Script
+ * Pilih fungsi ini di dropdown editor GAS lalu klik 'Jalankan' untuk menguji tanpa error.
+ */
+function testDoGet() {
+  const res = doGet({ parameter: { action: "getInitialData" } });
+  Logger.log(res.getContent());
 }
 
 // Main POST Endpoint (with LockService for Concurrency Safety)
