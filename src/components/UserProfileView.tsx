@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   User as UserIcon,
   QrCode,
@@ -9,6 +9,10 @@ import {
   AlertCircle,
   ChevronRight,
   BookOpen,
+  Camera,
+  Upload,
+  X,
+  Sparkles,
 } from 'lucide-react';
 import { User, Transaction } from '../types';
 import { saveUserToDB } from '../services/db';
@@ -19,7 +23,17 @@ interface UserProfileViewProps {
   onOpenStudentCard: () => void;
   onLogout: () => void;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onUpdateUser?: (updatedUser: User) => void;
 }
+
+const AVATAR_PRESETS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=300',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=300',
+];
 
 export const UserProfileView: React.FC<UserProfileViewProps> = ({
   currentUser,
@@ -27,6 +41,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   onOpenStudentCard,
   onLogout,
   onShowToast,
+  onUpdateUser,
 }) => {
   const [isChangingPin, setIsChangingPin] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
@@ -34,10 +49,46 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
 
+  // Avatar Modal State
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   if (!currentUser) return null;
 
   const activeLoans = userTransactions.filter((t) => t.status === 'DIPINJAM');
   const completedLoans = userTransactions.filter((t) => t.status === 'DIKEMBALIKAN');
+
+  const handleAvatarUpdate = async (newAvatarUrl: string) => {
+    try {
+      const updatedUser: User = { ...currentUser, avatarUrl: newAvatarUrl };
+      await saveUserToDB(updatedUser);
+      if (onUpdateUser) {
+        onUpdateUser(updatedUser);
+      }
+      onShowToast('Foto profil berhasil diperbarui!', 'success');
+      setIsAvatarModalOpen(false);
+    } catch (e) {
+      onShowToast('Gagal memperbarui foto profil.', 'error');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      onShowToast('Ukuran gambar maksimal 5MB.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        handleAvatarUpdate(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleChangePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,17 +109,20 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       return;
     }
 
-    const updatedUser: User = {
-      ...currentUser,
-      pin: newPin,
-    };
-
-    await saveUserToDB(updatedUser);
-    onShowToast('PIN akses Anda berhasil diperbarui!', 'success');
-    setIsChangingPin(false);
-    setCurrentPin('');
-    setNewPin('');
-    setConfirmPin('');
+    try {
+      const updatedUser: User = { ...currentUser, pin: newPin };
+      await saveUserToDB(updatedUser);
+      if (onUpdateUser) {
+        onUpdateUser(updatedUser);
+      }
+      onShowToast('PIN keamanan Anda berhasil diubah!', 'success');
+      setIsChangingPin(false);
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
+    } catch (err) {
+      setPinError('Gagal menyimpan PIN baru.');
+    }
   };
 
   return (
@@ -78,18 +132,23 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col items-center text-center relative overflow-hidden">
         <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
 
-        <div className="relative mb-3">
+        {/* Profile Avatar with Interactive Camera Edit Badge */}
+        <div className="relative mb-3 group cursor-pointer" onClick={() => setIsAvatarModalOpen(true)}>
           <img
             src={
               currentUser.avatarUrl ||
               `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.nis}`
             }
             alt={currentUser.nama}
-            className="w-22 h-22 rounded-full object-cover ring-4 ring-emerald-500/20 shadow-md border-2 border-white"
+            className="w-22 h-22 rounded-full object-cover ring-4 ring-emerald-500/20 shadow-md border-2 border-white group-hover:opacity-90 transition"
           />
-          <div className="absolute bottom-0 right-0 p-1.5 rounded-full bg-emerald-600 text-white shadow-xs">
-            <ShieldCheck className="w-4 h-4" />
-          </div>
+          <button
+            type="button"
+            className="absolute bottom-0 right-0 p-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md border-2 border-white transition transform group-hover:scale-110"
+            title="Ubah Foto Profil"
+          >
+            <Camera className="w-4 h-4" />
+          </button>
         </div>
 
         <h2 className="text-xl font-extrabold text-slate-900">{currentUser.nama}</h2>
@@ -266,6 +325,70 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
               Simpan PIN Baru
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Avatar Change Modal */}
+      {isAvatarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 border border-slate-200 shadow-2xl space-y-4 relative overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Ubah Foto Profil</h3>
+                  <p className="text-[10px] text-slate-500">Unggah foto atau pilih avatar preset</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="p-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Option 1: File Upload */}
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Unggah Foto Dari Galeri / Kamera</span>
+              </button>
+            </div>
+
+            {/* Option 2: Preset Avatars */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center gap-1 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Atau Pilih Avatar Preset:</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                {AVATAR_PRESETS.map((presetUrl, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAvatarUpdate(presetUrl)}
+                    className="aspect-square rounded-2xl overflow-hidden border-2 border-slate-200 hover:border-emerald-500 hover:scale-105 transition shadow-xs focus:outline-none"
+                  >
+                    <img src={presetUrl} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

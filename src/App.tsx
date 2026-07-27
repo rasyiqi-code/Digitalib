@@ -465,6 +465,7 @@ export const App: React.FC = () => {
               showToast('Anda telah keluar dari sesi perpustakaan.', 'info');
             }}
             onShowToast={showToast}
+            onUpdateUser={(u) => updateUserSession(u)}
           />
         )}
 
