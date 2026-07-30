@@ -200,7 +200,16 @@ export async function deleteBookFromDB(bookId: string): Promise<void> {
 // User operations
 export async function getUserByNIS(nis: string): Promise<User | undefined> {
   const db = await getDB();
-  return db.get('users', nis);
+  const normalizedNis = String(nis).trim();
+  const user = await db.get('users', normalizedNis);
+  if (user) return user;
+  
+  // Fallback check if stored key was numeric
+  if (!isNaN(Number(normalizedNis))) {
+    const numUser = await db.get('users', Number(normalizedNis) as any);
+    if (numUser) return { ...numUser, nis: String(numUser.nis) };
+  }
+  return undefined;
 }
 
 export async function getAppSetting(key: string, defaultValue?: any): Promise<any> {
@@ -240,12 +249,17 @@ export async function getAllUsersFromDB(): Promise<User[]> {
 
 export async function saveUserToDB(user: User): Promise<void> {
   const db = await getDB();
-  await db.put('users', user);
+  const normalizedUser: User = {
+    ...user,
+    nis: String(user.nis).trim(),
+    pin: String(user.pin || '').trim(),
+  };
+  await db.put('users', normalizedUser);
 }
 
 export async function deleteUserFromDB(nis: string): Promise<void> {
   const db = await getDB();
-  await db.delete('users', nis);
+  await db.delete('users', String(nis).trim());
 }
 
 // Transaction operations
@@ -257,7 +271,8 @@ export async function getAllTransactionsFromDB(): Promise<Transaction[]> {
 
 export async function getStudentTransactionsFromDB(nis: string): Promise<Transaction[]> {
   const db = await getDB();
-  const txs = await db.getAllFromIndex('transactions', 'by-nis', nis);
+  const normalizedNis = String(nis).trim();
+  const txs = await db.getAllFromIndex('transactions', 'by-nis', normalizedNis);
   return txs.sort((a, b) => new Date(b.tglPinjam).getTime() - new Date(a.tglPinjam).getTime());
 }
 
@@ -269,11 +284,12 @@ export async function createBorrowTransactionInDB(nis: string, book: Book, userN
   const maxDaysMs = (settings.maxBorrowDays || 7) * 24 * 60 * 60 * 1000;
   const dateKembaliMax = new Date(Date.now() + maxDaysMs).toISOString();
 
+  const normalizedNis = String(nis).trim();
   const newTx: Transaction = {
     id: txId,
-    nis,
+    nis: normalizedNis,
     namaSiswa: userNama,
-    bookId: book.id,
+    bookId: String(book.id),
     judulBuku: book.judul,
     tipeBuku: book.tipe,
     tglPinjam: datePinjam,
@@ -288,7 +304,7 @@ export async function createBorrowTransactionInDB(nis: string, book: Book, userN
 
   // Decrement physical stock (read fresh data from the same IDB transaction to avoid race)
   if (book.tipe === 'Fisik') {
-    const freshBook = await idbTx.objectStore('books').get(book.id);
+    const freshBook = await idbTx.objectStore('books').get(String(book.id));
     if (freshBook && freshBook.stok > 0) {
       const updatedBook = { ...freshBook, stok: freshBook.stok - 1 };
       await idbTx.objectStore('books').put(updatedBook);
@@ -299,7 +315,7 @@ export async function createBorrowTransactionInDB(nis: string, book: Book, userN
   const queueItem: SyncQueueItem = {
     id: 'SYNC-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
     type: 'borrow',
-    data: { nis, bookId: book.id, userNama },
+    data: { nis: normalizedNis, bookId: String(book.id), userNama },
     timestamp: new Date().toISOString(),
     status: 'pending',
   };
@@ -320,7 +336,7 @@ export async function createReturnTransactionInDB(transactionId: string): Promis
   tx.syncedToGAS = false;
 
   // Re-increment stock if physical
-  const book = await db.get('books', tx.bookId);
+  const book = await db.get('books', String(tx.bookId));
 
   // Atomic: all writes in a single transaction
   const idbTx = db.transaction(['transactions', 'books', 'sync_queue'], 'readwrite');
@@ -335,7 +351,7 @@ export async function createReturnTransactionInDB(transactionId: string): Promis
   const queueItem: SyncQueueItem = {
     id: 'SYNC-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
     type: 'return',
-    data: { transactionId: tx.id, bookId: tx.bookId },
+    data: { transactionId: tx.id, bookId: String(tx.bookId) },
     timestamp: new Date().toISOString(),
     status: 'pending',
   };
@@ -371,7 +387,13 @@ export async function populateFromGAS(books?: Book[], users?: User[], transactio
     await db.clear('books');
     const txB = db.transaction('books', 'readwrite');
     for (const b of books) {
-      await txB.store.put(b);
+      const normalizedBook: Book = {
+        ...b,
+        id: String(b.id),
+        isbn: String(b.isbn || ''),
+        stok: Number(b.stok) || 0,
+      };
+      await txB.store.put(normalizedBook);
     }
     await txB.done;
   }
@@ -380,7 +402,12 @@ export async function populateFromGAS(books?: Book[], users?: User[], transactio
     await db.clear('users');
     const txU = db.transaction('users', 'readwrite');
     for (const u of users) {
-      await txU.store.put(u);
+      const normalizedUser: User = {
+        ...u,
+        nis: String(u.nis).trim(),
+        pin: String(u.pin || '').trim(),
+      };
+      await txU.store.put(normalizedUser);
     }
     await txU.done;
   }
@@ -389,7 +416,13 @@ export async function populateFromGAS(books?: Book[], users?: User[], transactio
     await db.clear('transactions');
     const txT = db.transaction('transactions', 'readwrite');
     for (const t of transactions) {
-      await txT.store.put(t);
+      const normalizedTx: Transaction = {
+        ...t,
+        id: String(t.id),
+        nis: String(t.nis).trim(),
+        bookId: String(t.bookId),
+      };
+      await txT.store.put(normalizedTx);
     }
     await txT.done;
   }

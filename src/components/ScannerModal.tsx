@@ -32,10 +32,12 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
       stopCamera();
       setScannedFeedback(null);
       setCameraError(null);
+      setManualCode('');
       hasScannedRef.current = false;
       return;
     }
 
+    setManualCode('');
     let isMounted = true;
     const codeReader = new BrowserMultiFormatReader();
     codeReaderRef.current = codeReader;
@@ -49,7 +51,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            // Release temporary stream so ZXing can acquire it
+            // Release temporary stream so ZXing can acquire it cleanly
             stream.getTracks().forEach((track) => track.stop());
           } catch (permErr) {
             console.warn('[Scanner] Initial getUserMedia prompt failed or dismissed:', permErr);
@@ -58,7 +60,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
 
         if (!isMounted) return;
 
-        // List video input devices
+        // List video input devices AFTER permission has been requested (so labels are populated)
         let devices: MediaDeviceInfo[] = [];
         try {
           devices = await codeReader.listVideoInputDevices();
@@ -74,7 +76,8 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
               d.label.toLowerCase().includes('back') ||
               d.label.toLowerCase().includes('environment') ||
               d.label.toLowerCase().includes('belakang') ||
-              d.label.toLowerCase().includes('rear')
+              d.label.toLowerCase().includes('rear') ||
+              d.label.toLowerCase().includes('0')
           );
           targetId = backCam ? backCam.deviceId : devices[0].deviceId;
           if (isMounted) setSelectedDeviceId(targetId);
@@ -135,7 +138,9 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     const currentIndex = videoDevices.findIndex((d) => d.deviceId === selectedDeviceId);
     const nextIndex = (currentIndex + 1) % videoDevices.length;
     stopCamera();
-    setSelectedDeviceId(videoDevices[nextIndex].deviceId);
+    setTimeout(() => {
+      setSelectedDeviceId(videoDevices[nextIndex].deviceId);
+    }, 100);
   };
 
   const handleRetryCamera = () => {

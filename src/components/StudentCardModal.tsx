@@ -1,8 +1,10 @@
 import React, { useRef, useState } from 'react';
 import QRCode from 'react-qr-code';
 import { toPng } from 'html-to-image';
-import { X, ShieldCheck, CreditCard, Sparkles, BookOpenCheck, Download, Loader2 } from 'lucide-react';
+import { X, ShieldCheck, CreditCard, BookOpenCheck, Download, Loader2, CheckCircle2 } from 'lucide-react';
 import { User, Transaction, LibrarySettings } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 interface StudentCardModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
 }) => {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   if (!isOpen || !user) return null;
 
@@ -39,16 +42,37 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
   const handleDownloadPng = async () => {
     if (!cardRef.current) return;
     setIsDownloading(true);
+    setDownloadSuccess(false);
     try {
       const dataUrl = await toPng(cardRef.current, {
         quality: 0.98,
         cacheBust: true,
         pixelRatio: 2, // High resolution crisp image export
+        skipFonts: true,
       });
-      const link = document.createElement('a');
-      link.download = `Kartu_Anggota_${user.nis}_${user.nama.replace(/\s+/g, '_')}.png`;
-      link.href = dataUrl;
-      link.click();
+
+      const fileName = `Kartu_Anggota_${user.nis}_${user.nama.replace(/\s+/g, '_')}.png`;
+
+      // Save natively via Capacitor Filesystem if running on mobile device
+      if (Capacitor.isNativePlatform()) {
+        const base64Data = dataUrl.split(',')[1] || dataUrl;
+        await Filesystem.writeFile({
+          path: fileName,
+          data: base64Data,
+          directory: Directory.Documents,
+        });
+      } else {
+        // Standard Web browser download
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3500);
     } catch (err) {
       console.error('Gagal mengunduh gambar kartu:', err);
     } finally {
@@ -192,12 +216,21 @@ export const StudentCardModal: React.FC<StudentCardModalProps> = ({
           <button
             onClick={handleDownloadPng}
             disabled={isDownloading}
-            className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2"
+            className={`w-full py-3 px-4 rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 ${
+              downloadSuccess
+                ? 'bg-emerald-700 text-white shadow-emerald-700/20'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 disabled:opacity-50'
+            }`}
           >
             {isDownloading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Mengunduh Berkas PNG...</span>
+              </>
+            ) : downloadSuccess ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-emerald-300 animate-bounce" />
+                <span>Kartu Berhasil Disimpan ke HP / Peramban!</span>
               </>
             ) : (
               <>

@@ -107,10 +107,26 @@ export async function syncPendingQueueToGAS(): Promise<{ synced: number; failed:
 
     const result = await response.json();
     if (result.status === 'success') {
-      for (const item of pendingItems) {
-        await markSyncItemCompleted(item.id);
+      let syncedCount = 0;
+      let failedCount = 0;
+      const batchResults = result.results || [];
+
+      for (let i = 0; i < pendingItems.length; i++) {
+        const item = pendingItems[i];
+        const itemRes = batchResults[i];
+        if (!itemRes || itemRes.status === 'success') {
+          await markSyncItemCompleted(item.id);
+          syncedCount++;
+        } else {
+          failedCount++;
+          console.warn(`[Sync] Queue item ${item.id} failed on GAS:`, itemRes.message);
+        }
       }
-      return { synced: pendingItems.length, failed: 0, message: `Berhasil sinkronisasi ${pendingItems.length} transaksi ke Google Sheets.` };
+
+      if (failedCount > 0) {
+        return { synced: syncedCount, failed: failedCount, message: `Sinkronisasi selesai: ${syncedCount} berhasil, ${failedCount} gagal.` };
+      }
+      return { synced: syncedCount, failed: 0, message: `Berhasil sinkronisasi ${syncedCount} transaksi ke Google Sheets.` };
     } else {
       return { synced: 0, failed: pendingItems.length, message: result.message || 'Gagal sinkron ke GAS.' };
     }

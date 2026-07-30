@@ -439,7 +439,7 @@ function handleBorrowBook(payload) {
   }
 
   // Record Transaction
-  const txId = "TX" + Date.now();
+  const txId = "TX-" + Date.now() + "-" + Math.random().toString(36).substring(2, 8);
   const datePinjam = new Date().toISOString();
   const dateMax = new Date(Date.now() + maxBorrowDays * 24 * 60 * 60 * 1000).toISOString();
   sheetTx.appendRow([txId, nis, userNama, bookId, bookTitle, bookType, datePinjam, dateMax, "", "DIPINJAM"]);
@@ -463,11 +463,13 @@ function handleReturnBook(payload) {
   const txData = sheetTx.getDataRange().getValues();
   let txRow = -1;
   let targetBookId = bookId;
+  let bookType = "Fisik";
 
   for (let i = 1; i < txData.length; i++) {
     if (dataMatch(txData[i][0], transactionId)) {
       txRow = i + 1;
       targetBookId = txData[i][3];
+      bookType = String(txData[i][5] || "Fisik").trim();
       break;
     }
   }
@@ -485,8 +487,8 @@ function handleReturnBook(payload) {
   sheetTx.getRange(txRow, 9).setValue(new Date().toISOString()); // tglDikembalikan
   sheetTx.getRange(txRow, 10).setValue("DIKEMBALIKAN"); // status
 
-  // Increase stock back if physical book
-  if (targetBookId) {
+  // Increase stock back ONLY if physical book
+  if (targetBookId && bookType === "Fisik") {
     const bukuData = sheetBuku.getDataRange().getValues();
     for (let i = 1; i < bukuData.length; i++) {
       if (String(bukuData[i][0]) === String(targetBookId)) {
@@ -508,19 +510,27 @@ function dataMatch(val1, val2) {
 function handleSyncBatch(payload) {
   const items = payload.items || [];
   const results = [];
+  let successCount = 0;
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
+    let res = { status: "error", message: "Tipe aksi antrean tidak dikenal" };
+
     if (item.type === "borrow" || item.action === "BORROW") {
-      results.push(handleBorrowBook(item.data || item.payload));
+      res = handleBorrowBook(item.data || item.payload);
     } else if (item.type === "return" || item.action === "RETURN") {
-      results.push(handleReturnBook(item.data || item.payload));
+      res = handleReturnBook(item.data || item.payload);
     } else if (item.action === "ADD_BOOK") {
-      results.push(handleAddBook(item.payload));
+      res = handleAddBook(item.payload);
     }
+
+    if (res && res.status === "success") {
+      successCount++;
+    }
+    results.push(res);
   }
 
-  return { status: "success", syncedCount: items.length, results: results };
+  return { status: "success", syncedCount: successCount, totalCount: items.length, results: results };
 }
 
 // JSON Output Formatter

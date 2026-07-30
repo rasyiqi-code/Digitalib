@@ -200,6 +200,85 @@ export const App: React.FC = () => {
     };
   }, [refreshData]);
 
+  // Handle Native Android Hardware / Gesture Back Button
+  const navigationStateRef = useRef({
+    isScannerOpen,
+    isPDFReaderOpen,
+    isAuthOpen,
+    isStudentCardOpen,
+    isSettingsOpen,
+    activeTab,
+  });
+  navigationStateRef.current = {
+    isScannerOpen,
+    isPDFReaderOpen,
+    isAuthOpen,
+    isStudentCardOpen,
+    isSettingsOpen,
+    activeTab,
+  };
+
+  useEffect(() => {
+    let backListener: any = null;
+
+    const registerBackHandler = async () => {
+      try {
+        const { App: CapApp } = await import('@capacitor/app');
+        backListener = await CapApp.addListener('backButton', () => {
+          const {
+            isScannerOpen,
+            isPDFReaderOpen,
+            isAuthOpen,
+            isStudentCardOpen,
+            isSettingsOpen,
+            activeTab,
+          } = navigationStateRef.current;
+
+          // Priority 1: Close active modals
+          if (isScannerOpen) {
+            setIsScannerOpen(false);
+            return;
+          }
+          if (isPDFReaderOpen) {
+            setIsPDFReaderOpen(false);
+            return;
+          }
+          if (isAuthOpen) {
+            setIsAuthOpen(false);
+            return;
+          }
+          if (isStudentCardOpen) {
+            setIsStudentCardOpen(false);
+            return;
+          }
+          if (isSettingsOpen) {
+            setIsSettingsOpen(false);
+            return;
+          }
+
+          // Priority 2: Navigate back to catalog if on another tab
+          if (activeTab !== 'catalog') {
+            setActiveTab('catalog');
+            return;
+          }
+
+          // Priority 3: Exit App when on root catalog
+          CapApp.exitApp();
+        });
+      } catch (e) {
+        // App plugin fallback for web
+      }
+    };
+
+    registerBackHandler();
+
+    return () => {
+      if (backListener && typeof backListener.remove === 'function') {
+        backListener.remove();
+      }
+    };
+  }, []);
+
   // Keep a ref to userTransactions to avoid stale closures in borrow/return handlers
   const userTransactionsRef = useRef<Transaction[]>([]);
   userTransactionsRef.current = userTransactions;
@@ -250,8 +329,21 @@ export const App: React.FC = () => {
 
   // Handle Scanner Result
   const handleScanResult = async (code: string) => {
-    // 1. Check if scanned code is an ISBN in catalog
-    const matchedBook = books.find((b) => b.isbn === code || b.id === code);
+    const rawCode = code.trim();
+    const cleanSearchCode = rawCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+    // 1. Check if scanned code matches an ISBN or Book ID in catalog (hyphen-agnostic)
+    const matchedBook = books.find((b) => {
+      const bIsbnClean = b.isbn.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const bIdClean = b.id.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      return (
+        bIsbnClean === cleanSearchCode ||
+        bIdClean === cleanSearchCode ||
+        b.isbn === rawCode ||
+        b.id === rawCode
+      );
+    });
+
     if (matchedBook) {
       if (currentUser) {
         await handleBorrowBook(matchedBook);
@@ -264,7 +356,7 @@ export const App: React.FC = () => {
 
     // 2. Check if scanned code is a Student QR payload
     try {
-      const parsed = JSON.parse(code);
+      const parsed = JSON.parse(rawCode);
       if (parsed.nis) {
         showToast(`QR Siswa Terdeteksi: ${parsed.nama} (NIS: ${parsed.nis})`, 'success');
         return;
@@ -273,7 +365,7 @@ export const App: React.FC = () => {
       // Not JSON QR
     }
 
-    showToast(`Kode terdeteksi: ${code}. Tidak cocok dengan katalog.`, 'info');
+    showToast(`Kode terdeteksi: ${rawCode}. Tidak cocok dengan katalog.`, 'info');
   };
 
   // Trigger Manual GAS Sync (with concurrency guard)

@@ -211,7 +211,7 @@ export const PDFReaderModal: React.FC<PDFReaderModalProps> = ({ isOpen, onClose,
               src={embedPdfUrl}
               className="w-full h-[calc(100%+56px)] -mt-14 border-0 bg-white"
               title={`E-Book Reader - ${book.judul}`}
-              sandbox="allow-same-origin"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             />
           </div>
         ) : (

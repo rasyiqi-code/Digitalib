@@ -1,5 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
-  <path d="M6 6h10"/>
-  <path d="M6 10h8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="bookmarkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a7f3d0"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <filter id="emeraldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGrad)" stroke="#10b981" stroke-width="6" stroke-opacity="0.4"/>
+  <rect x="24" y="24" width="464" height="464" rx="100" fill="none" stroke="url(#emeraldGrad)" stroke-width="3" stroke-opacity="0.6"/>
+
+  <g filter="url(#emeraldGlow)">
+    <path d="M 120 180 C 155 170, 205 180, 230 195 L 230 345 C 205 330, 155 320, 120 330 Z" fill="none" stroke="url(#emeraldGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 140 200 C 170 192, 210 200, 230 210 L 230 325 C 210 315, 170 307, 140 315 Z" fill="none" stroke="url(#emeraldGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+
+    <path d="M 382 180 C 347 170, 297 180, 272 195 L 272 345 C 297 330, 347 320, 382 330 Z" fill="none" stroke="url(#emeraldGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 362 200 C 332 192, 292 200, 272 210 L 272 325 C 292 315, 332 307, 362 315 Z" fill="none" stroke="url(#emeraldGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+
+    <path d="M 230 345 C 243 352, 259 352, 272 345" fill="none" stroke="url(#emeraldGrad)" stroke-width="16" stroke-linecap="round"/>
+
+    <path d="M 315 155 L 355 155 C 360 155, 365 160, 365 165 L 365 335 L 335 370 L 305 335 L 305 165 C 305 160, 310 155, 315 155 Z" fill="url(#bookmarkGrad)" stroke="#6ee7b7" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M 335 175 L 335 325" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+    <path d="M 180 240 L 185 255 L 200 260 L 185 265 L 180 280 L 175 265 L 160 260 L 175 255 Z" fill="#6ee7b7"/>
+    <path d="M 210 220 L 213 228 L 221 231 L 213 234 L 210 242 L 207 234 L 199 231 L 207 228 Z" fill="#a7f3d0"/>
+  </g>
 </svg>
